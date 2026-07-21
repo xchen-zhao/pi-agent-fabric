@@ -1,6 +1,10 @@
 # Pi Agent Fabric
 
-以 Pi 为统一入口的全局本地 Agent 编排项目，目标适配：
+> Build the open, local-first, vendor-neutral orchestration fabric that developers trust to coordinate any AI agent—safely, transparently, and reliably.
+
+以 Pi 为统一入口的全局本地 Agent 编排项目。它不是另一个 Agent，而是让不同 Agent 安全、透明、可靠地协同工作并实现 1+1>2 的基础设施。
+
+目标适配：
 
 - Pi
 - Claude Code
@@ -51,4 +55,4 @@ pi -e ./src/extension/index.ts
 - 无法精确查询的额度明确标记为 `unknown` 或 `inferred`。
 - 外部 Agent 自动执行将在后续版本加入超时、输出截断、工作区隔离和配额租约。
 
-架构见 [`docs/architecture.md`](docs/architecture.md)。
+项目的 North Star 和不可妥协原则见 [`docs/vision-and-principles.md`](docs/vision-and-principles.md)，架构见 [`docs/architecture.md`](docs/architecture.md)。

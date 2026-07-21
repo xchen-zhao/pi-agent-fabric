@@ -1,8 +1,29 @@
 # AGENTS.md
 
+## North Star
+
+> 打造一个让全球开发者信赖、赞叹并愿意共同参与的，开源、本地优先、厂商中立、可靠可恢复的 AI Agent 编排基础设施。让任何开发者都能在一个统一控制平面中，安全、透明、高效地协调不同 Agent，使它们真正实现 1+1>2。
+
+> Build the open, local-first, vendor-neutral orchestration fabric that developers trust to coordinate any AI agent—safely, transparently, and reliably.
+
+完整愿景、成功标准与决策优先级见 `docs/vision-and-principles.md`，所有设计和代码决策都必须遵守。
+
 ## 项目目标
 
 本项目构建一个以 Pi 为统一入口的全局本地 Agent 编排层，适配 Pi、Claude Code、Codex CLI、Grok 和 Kimi Code，并提供额度感知调度、任务持久化和隔离工作区。
+
+## 不可妥协的原则
+
+1. 不制造另一个 Agent，而是让不同 Agent 更好地协作。
+2. 不绑定任何厂商、模型、CLI 或云平台。
+3. 本地优先，用户拥有代码、数据、任务和运行历史。
+4. 可靠性优先于炫技，失败必须可恢复。
+5. 不知道就是不知道，不伪造额度、成本和确定性。
+6. 每一次调度都必须可解释。
+7. 安全、隔离和权限边界必须从第一天设计。
+8. 核心保持精简，能力通过 Adapter 和插件扩展。
+9. 用 Agent 的差异创造协同价值，避免重复消耗。
+10. 面向真实日常使用构建，而不是只做 Demo。
 
 ## 开发约定
 
