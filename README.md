@@ -16,7 +16,7 @@
 
 ## 当前状态
 
-当前为 **V0 Runtime Discovery**：只执行 `--version` 等无副作用命令，不发送模型请求，不消耗模型额度，不读取认证文件内容。
+当前处于 **V1 Runtime Execution**：已完成 Runtime Discovery、内部 Adapter 协议、Process Supervisor、统一 Executor、JSONL 事件归一化和安全执行门禁。Pi、Claude、Codex、Grok 已通过端到端只读复测；Kimi 在 ACP 或外部沙箱完成前会被拒绝执行。
 
 ## 开发
 
@@ -33,6 +33,21 @@ npm run doctor
 node dist/src/cli/index.js doctor
 node dist/src/cli/index.js agents
 node dist/src/cli/index.js quota
+# 预览，不消耗额度
+node dist/src/cli/index.js run \
+  --runtime codex \
+  --prompt "Analyze this project" \
+  --cwd . \
+  --read-only \
+  --dry-run
+
+# 明确执行，会消耗所选 Runtime 的额度
+printf 'Analyze this project' | node dist/src/cli/index.js run \
+  --runtime codex \
+  --prompt - \
+  --cwd . \
+  --read-only \
+  --execute
 ```
 
 ## 作为 Pi 扩展试运行
@@ -46,6 +61,8 @@ pi -e ./src/extension/index.ts
 ```text
 /fabric-agents
 /fabric-quota
+/fabric-dry-run codex Analyze this project
+/fabric-run codex Analyze this project
 ```
 
 ## 安全原则
@@ -53,6 +70,8 @@ pi -e ./src/extension/index.ts
 - 不读取或输出认证文件内容。
 - 不通过抓取网页查询订阅额度。
 - 无法精确查询的额度明确标记为 `unknown` 或 `inferred`。
-- 外部 Agent 自动执行将在后续版本加入超时、输出截断、工作区隔离和配额租约。
+- 外部 Agent 执行具备超时、取消、输出截断、脱敏日志和只读门禁。
+- CLI 必须显式使用 `--execute`；Pi 扩展在执行前必须二次确认。
+- Kimi 直接 Prompt 模式无法强制只读，因此当前拒绝自动执行。
 
-项目的 North Star 和不可妥协原则见 [`docs/vision-and-principles.md`](docs/vision-and-principles.md)，架构见 [`docs/architecture.md`](docs/architecture.md)。
+项目的 North Star 和不可妥协原则见 [`docs/vision-and-principles.md`](docs/vision-and-principles.md)，架构见 [`docs/architecture.md`](docs/architecture.md)，V1 执行设计见 [`docs/runtime-execution.md`](docs/runtime-execution.md)。
