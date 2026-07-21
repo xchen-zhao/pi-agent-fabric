@@ -56,6 +56,7 @@ export type RuntimeErrorCategory =
   | "rate-limited"
   | "spawn-failed"
   | "timeout"
+  | "unsafe-execution"
   | "unknown";
 
 export interface ProcessResult {
@@ -67,6 +68,7 @@ export interface ProcessResult {
   aborted: boolean;
   truncated: boolean;
   fullOutputPath?: string;
+  spawnError?: string;
   durationMs: number;
 }
 
@@ -75,6 +77,32 @@ export interface RuntimeError {
   message: string;
   retryable: boolean;
   retryAfterMs?: number;
+}
+
+export interface AgentUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  costUsd?: number;
+}
+
+export interface AgentResult {
+  runtime: RuntimeId;
+  status: "completed" | "failed";
+  text: string;
+  usage: AgentUsage;
+  quota?: Extract<AgentEvent, { type: "quota.updated" }>;
+  error?: RuntimeError;
+  process: {
+    exitCode: number | null;
+    signal: NodeJS.Signals | null;
+    durationMs: number;
+    timedOut: boolean;
+    aborted: boolean;
+    truncated: boolean;
+    fullOutputPath?: string;
+  };
 }
 
 export interface DryRunPlan {

@@ -11,7 +11,9 @@
 - 已实现超时、取消、进程组终止、输出限制、日志和基础脱敏的 Process Supervisor。
 - 已通过最小真实 Smoke Test 验证 Pi、Claude、Codex 和 Grok 的 JSONL；Kimi 准确识别到当前计费周期额度已耗尽。
 - 已为四个成功 Runtime 建立脱敏 Fixture 和基础事件 Parser，并解析 Claude 报告的限流窗口。
-- `fabric run` 当前仍强制要求 `--read-only --dry-run`，不会启动 Agent 或消耗模型额度。
+- 已实现统一 Executor，将 Adapter、Process Supervisor、Parser、错误分类、Usage、Quota Signal 和最终 `AgentResult` 串联。
+- Pi、Claude、Codex 和 Grok 已通过统一 CLI 的端到端只读复测；Kimi 在启动进程前被安全门禁拒绝。
+- `fabric run` 必须明确二选一：`--dry-run` 不消耗额度，`--execute` 启动 Agent 并消耗对应额度。
 
 ## Dry Run
 
@@ -28,7 +30,10 @@ Pi 扩展中可使用：
 
 ```text
 /fabric-dry-run codex Analyze this project
+/fabric-run codex Analyze this project
 ```
+
+`/fabric-run` 在 TUI/RPC 中执行前必须由用户二次确认；无 UI 的扩展命令拒绝执行。Headless 自动化应使用 CLI 的显式 `--execute`。
 
 ## 安全设计
 
@@ -45,7 +50,7 @@ Pi 扩展中可使用：
 ## 下一步
 
 1. 完善工具调用、失败和中断事件 Fixture。
-2. 增加统一 Executor，将 Supervisor 与 Adapter Parser 串联。
-3. 启用 Pi、Claude、Codex 和 Grok 的单 Runtime 只读执行。
-4. 为 Kimi 评估 ACP 或外部沙箱执行路径。
-5. 将认证、限流、额度不足和模型不可用归一化为稳定错误分类。
+2. 为 Kimi 评估 ACP 或外部沙箱执行路径。
+3. 将认证、限流、额度不足和模型不可用归一化为稳定错误分类。
+4. 设计本地 Usage Ledger，但不把推断数据伪装成精确额度。
+5. 在统一执行稳定后再增加供父 Agent 调用的委派工具。

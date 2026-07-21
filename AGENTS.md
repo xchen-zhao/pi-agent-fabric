@@ -36,7 +36,9 @@
 - 多个写 Agent 不得共享同一普通工作目录；代码任务后续统一使用 Git worktree 或沙箱。
 - 注释和文档优先使用中文；公开类型和代码标识符使用英文。
 - 新增功能必须补测试。
+- 每个开发批次完成后必须执行“审查 → 整理 → 复测 → 复盘”闭环：检查 diff、错误路径、安全边界、文档和测试，整理临时代码，再运行类型检查与完整测试；未完成该闭环不得宣称完成。
+- 每次复盘都要记录新发现、遗留风险和下一步，不掩盖失败，不把一次成功 Smoke Test 当成完整验证。
 
 ## 当前阶段
 
-V1 Runtime Execution：已实现内部 Adapter 协议、只读命令计划、Process Supervisor 和 Dry Run。真实 Agent 执行尚未开放；任何会消耗额度的 Smoke Test 必须先获得用户明确确认。
+V1 Runtime Execution：已实现内部 Adapter 协议、Process Supervisor、统一 Executor、Dry Run、显式 Execute 和四个 Runtime 的端到端只读复测。Kimi 因无法在 Prompt 模式强制只读而保持禁用。任何额外的额度消耗测试仍须说明必要性，避免重复消耗。

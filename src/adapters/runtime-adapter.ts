@@ -21,6 +21,7 @@ export function promptPlaceholder(prompt: string): string {
 }
 
 export function classifyCommonError(result: ProcessResult): RuntimeError | undefined {
+  if (result.spawnError) return { category: "spawn-failed", message: result.spawnError, retryable: false };
   if (result.aborted) return { category: "aborted", message: "Execution aborted", retryable: false };
   if (result.timedOut) return { category: "timeout", message: "Execution timed out", retryable: true };
   if (result.exitCode === 0) return undefined;

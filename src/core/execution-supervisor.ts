@@ -75,6 +75,7 @@ export async function superviseExecution(
     let timedOut = false;
     let aborted = false;
     let settled = false;
+    let spawnError: string | undefined;
     let timer: NodeJS.Timeout | undefined;
     let forceKillTimer: NodeJS.Timeout | undefined;
 
@@ -101,6 +102,7 @@ export async function superviseExecution(
           aborted,
           truncated: stdout.truncated || stderr.truncated,
           fullOutputPath,
+          ...(spawnError ? { spawnError } : {}),
           durationMs: Date.now() - startedAt,
         });
       });
@@ -120,7 +122,8 @@ export async function superviseExecution(
         env: process.env,
       });
     } catch (error) {
-      log.write(`[spawn-error] ${redactSecrets(error instanceof Error ? error.message : String(error))}\n`);
+      spawnError = redactSecrets(error instanceof Error ? error.message : String(error));
+      log.write(`[spawn-error] ${spawnError}\n`);
       finish(null, null);
       return;
     }
@@ -147,6 +150,7 @@ export async function superviseExecution(
     });
     child.on("error", (error) => {
       const text = redactSecrets(error.message);
+      spawnError = text;
       stderr.append(text);
       log.write(`[process-error] ${text}\n`);
     });

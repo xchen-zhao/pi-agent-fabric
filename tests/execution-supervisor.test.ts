@@ -37,3 +37,25 @@ test("supervisor terminates timed out processes", async () => {
   assert.equal(result.timedOut, true);
   assert.notEqual(result.exitCode, 0);
 });
+
+test("supervisor responds to AbortSignal", async () => {
+  const logDir = await mkdtemp(path.join(os.tmpdir(), "fabric-test-"));
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 30);
+  const result = await superviseExecution(nodeSpec("setTimeout(() => {}, 10000)"), {
+    logDir,
+    signal: controller.signal,
+  });
+  assert.equal(result.aborted, true);
+  assert.equal(result.timedOut, false);
+});
+
+test("supervisor redacts returned output and persisted logs", async () => {
+  const logDir = await mkdtemp(path.join(os.tmpdir(), "fabric-test-"));
+  const result = await superviseExecution(nodeSpec("console.log('authorization: Bearer secret-token-value')"), { logDir });
+  assert.doesNotMatch(result.stdout, /secret-token-value/);
+  assert.ok(result.fullOutputPath);
+  const log = await readFile(result.fullOutputPath, "utf8");
+  assert.doesNotMatch(log, /secret-token-value/);
+  assert.match(log, /REDACTED/);
+});
