@@ -1,4 +1,6 @@
 {"type":"agent_start"}
+{"type":"tool_execution_start","toolCallId":"fixture-call","toolName":"read","args":{"path":"README.md"}}
+{"type":"tool_execution_end","toolCallId":"fixture-call","toolName":"read","isError":false,"result":{"content":[]}}
 {"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"OK"}}
 {"type":"message_end","message":{"role":"assistant","usage":{"input":100,"output":2,"cacheRead":10,"cacheWrite":5,"cost":{"total":0.01}}}}
 {"type":"agent_settled"}

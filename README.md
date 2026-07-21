@@ -16,7 +16,7 @@
 
 ## 当前状态
 
-当前处于 **V1 Runtime Execution**：已完成 Runtime Discovery、内部 Adapter 协议、Process Supervisor、统一 Executor、JSONL 事件归一化和安全执行门禁。Pi、Claude、Codex、Grok 已通过端到端只读复测；Kimi 在 ACP 或外部沙箱完成前会被拒绝执行。
+当前已完成 **V1.1 Runtime Hardening**：具备统一 Executor、安全 Prompt 通道、JSONL 事件归一化、本地 Usage Ledger 和错误/额度信号。Pi、Claude、Codex、Grok 已通过端到端只读复测；Kimi 在 ACP 与 OS 沙箱双重保护完成前会被拒绝执行。
 
 ## 开发
 
@@ -33,6 +33,8 @@ npm run doctor
 node dist/src/cli/index.js doctor
 node dist/src/cli/index.js agents
 node dist/src/cli/index.js quota
+node dist/src/cli/index.js usage --recent 10
+
 # 预览，不消耗额度
 node dist/src/cli/index.js run \
   --runtime codex \
@@ -61,6 +63,7 @@ pi -e ./src/extension/index.ts
 ```text
 /fabric-agents
 /fabric-quota
+/fabric-usage
 /fabric-dry-run codex Analyze this project
 /fabric-run codex Analyze this project
 ```
@@ -74,4 +77,4 @@ pi -e ./src/extension/index.ts
 - CLI 必须显式使用 `--execute`；Pi 扩展在执行前必须二次确认。
 - Kimi 直接 Prompt 模式无法强制只读，因此当前拒绝自动执行。
 
-项目的 North Star 和不可妥协原则见 [`docs/vision-and-principles.md`](docs/vision-and-principles.md)，架构见 [`docs/architecture.md`](docs/architecture.md)，V1 执行设计见 [`docs/runtime-execution.md`](docs/runtime-execution.md)。
+项目的 North Star 和不可妥协原则见 [`docs/vision-and-principles.md`](docs/vision-and-principles.md)，架构见 [`docs/architecture.md`](docs/architecture.md)，V1 执行设计见 [`docs/runtime-execution.md`](docs/runtime-execution.md)，本地用量记录见 [`docs/usage-ledger.md`](docs/usage-ledger.md)，Kimi 安全结论见 [`docs/kimi-acp-assessment.md`](docs/kimi-acp-assessment.md)。

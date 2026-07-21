@@ -20,6 +20,12 @@ for (const runtime of ["pi", "claude", "codex", "grok"] as const) {
   });
 }
 
+test("Pi parser normalizes tool lifecycle events", async () => {
+  const events = await parseFixture("pi");
+  assert.ok(events.some((event) => event.type === "tool.started" && event.name === "read"));
+  assert.ok(events.some((event) => event.type === "tool.finished" && event.name === "read" && !event.isError));
+});
+
 test("Claude parser reports provider rate-limit state", async () => {
   const events = await parseFixture("claude");
   const quota = events.find((event) => event.type === "quota.updated");

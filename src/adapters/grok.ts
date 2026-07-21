@@ -2,7 +2,6 @@ import type { AgentEvent, CommandSpec, ExecutionRequest } from "../core/executio
 import type { RuntimeDefinition } from "../core/types.js";
 import { BaseRuntimeAdapter } from "./base-adapter.js";
 import { completed, numberValue, record, stringValue, textDelta, usageEvent } from "./event-utils.js";
-import { promptPlaceholder } from "./runtime-adapter.js";
 
 export class GrokAdapter extends BaseRuntimeAdapter {
   constructor(definition: RuntimeDefinition) {
@@ -31,6 +30,7 @@ export class GrokAdapter extends BaseRuntimeAdapter {
   }
 
   buildCommand(request: ExecutionRequest): CommandSpec {
+    const promptFileToken = "__PI_AGENT_FABRIC_PROMPT_FILE__";
     const args = [
       "--cwd",
       request.cwd,
@@ -41,15 +41,15 @@ export class GrokAdapter extends BaseRuntimeAdapter {
       "--no-subagents",
       "--no-memory",
       "--disable-web-search",
-      "--single",
-      request.prompt,
+      "--prompt-file",
+      promptFileToken,
     ];
-    const displayArgs = [...args];
-    displayArgs[displayArgs.length - 1] = promptPlaceholder(request.prompt);
+    const displayArgs = args.map((arg) => arg === promptFileToken ? "<prompt-file>" : arg);
     return {
       command: this.definition.command,
       args,
       displayArgs,
+      temporaryFiles: [{ token: promptFileToken, content: request.prompt, fileName: "prompt.md" }],
       cwd: request.cwd,
       outputFormat: "jsonl",
       timeoutMs: request.timeoutMs,

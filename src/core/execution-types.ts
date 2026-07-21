@@ -11,12 +11,19 @@ export interface ExecutionRequest {
   timeoutMs: number;
 }
 
+export interface TemporaryFileSpec {
+  token: string;
+  content: string;
+  fileName: string;
+}
+
 export interface CommandSpec {
   command: string;
   args: string[];
   displayArgs: string[];
   cwd: string;
   stdin?: string;
+  temporaryFiles?: TemporaryFileSpec[];
   outputFormat: OutputFormat;
   timeoutMs: number;
   readOnlyEnforcement: "native" | "best-effort";
@@ -49,6 +56,7 @@ export type AgentEvent =
 
 export type RuntimeErrorCategory =
   | "aborted"
+  | "audit-log-failed"
   | "authentication"
   | "executable-not-found"
   | "invalid-output"
@@ -69,6 +77,7 @@ export interface ProcessResult {
   truncated: boolean;
   fullOutputPath?: string;
   spawnError?: string;
+  logError?: string;
   durationMs: number;
 }
 
@@ -113,7 +122,7 @@ export interface DryRunPlan {
   mode: ExecutionMode;
   outputFormat: OutputFormat;
   timeoutMs: number;
-  promptDelivery: "stdin" | "argument";
+  promptDelivery: "stdin" | "argument" | "file";
   readOnlyEnforcement: "native" | "best-effort";
   safetyNote?: string;
 }

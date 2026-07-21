@@ -5,6 +5,7 @@ import { executeAgent } from "../core/executor.js";
 import { formatRuntimeTable } from "../core/format.js";
 import { RUNTIME_IDS, type RuntimeId } from "../core/types.js";
 import { initialQuotaSnapshot } from "../quota/broker.js";
+import { UsageLedger } from "../usage/ledger.js";
 
 export default function agentFabricExtension(pi: ExtensionAPI): void {
   pi.registerCommand("fabric-agents", {
@@ -24,6 +25,22 @@ export default function agentFabricExtension(pi: ExtensionAPI): void {
         return `${runtime.displayName}: ${quota.status} (${quota.confidence}) - ${quota.note ?? "-"}`;
       });
       ctx.ui.notify(lines.join("\n"), "info");
+    },
+  });
+
+  pi.registerCommand("fabric-usage", {
+    description: "显示本地 Agent Usage 汇总，不发送模型请求",
+    handler: async (_args, ctx) => {
+      const ledger = UsageLedger.open();
+      try {
+        const rows = ledger.summaries();
+        const lines = rows.length === 0
+          ? ["No recorded Agent runs."]
+          : rows.map((row) => `${row.runtime}: runs=${row.runs}, ok=${row.completed}, failed=${row.failed}, input=${row.inputTokens}, output=${row.outputTokens}, cost=$${row.costUsd.toFixed(4)}`);
+        ctx.ui.notify(lines.join("\n"), "info");
+      } finally {
+        ledger.close();
+      }
     },
   });
 
@@ -71,13 +88,25 @@ export default function agentFabricExtension(pi: ExtensionAPI): void {
 
       ctx.ui.setStatus("agent-fabric", `Running ${parsed.runtime}...`);
       try {
-        const result = await executeAgent({
+        const request = {
           runtime: parsed.runtime,
           prompt: parsed.task,
           cwd: ctx.cwd,
-          mode: "read-only",
+          mode: "read-only" as const,
           timeoutMs: 600_000,
-        });
+        };
+        const startedAt = new Date();
+        const result = await executeAgent(request);
+        try {
+          const ledger = UsageLedger.open();
+          try {
+            ledger.record(request, result, startedAt);
+          } finally {
+            ledger.close();
+          }
+        } catch (error) {
+          ctx.ui.notify(`Usage recording failed: ${error instanceof Error ? error.message : String(error)}`, "warning");
+        }
         const summary = result.status === "completed"
           ? `${result.text}\n\nUsage: ${JSON.stringify(result.usage)}\nLog: ${result.process.fullOutputPath ?? "-"}`
           : `${result.error?.category ?? "unknown"}: ${result.error?.message ?? "Execution failed"}`;

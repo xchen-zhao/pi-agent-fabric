@@ -16,7 +16,11 @@ export async function createDryRunPlan(request: ExecutionRequest): Promise<DryRu
     mode: request.mode,
     outputFormat: command.outputFormat,
     timeoutMs: command.timeoutMs,
-    promptDelivery: command.stdin === undefined ? "argument" : "stdin",
+    promptDelivery: command.stdin !== undefined
+      ? "stdin"
+      : command.temporaryFiles?.length
+        ? "file"
+        : "argument",
     readOnlyEnforcement: command.readOnlyEnforcement,
     ...(command.safetyNote ? { safetyNote: command.safetyNote } : {}),
   };
