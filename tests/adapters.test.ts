@@ -34,13 +34,18 @@ test("Kimi declares best-effort read-only enforcement", () => {
   assert.match(spec.safetyNote ?? "", /ACP|sandbox/);
 });
 
-test("dry-run display does not expose argument-delivered prompts", () => {
-  for (const id of ["grok", "kimi"] as const) {
-    const spec = getRuntimeAdapter(id).buildCommand({ ...baseRequest, runtime: id });
-    assert.equal(spec.args.includes(baseRequest.prompt), true);
-    assert.equal(spec.displayArgs.includes(baseRequest.prompt), false);
-    assert.match(spec.displayArgs.at(-1) ?? "", /^<prompt:\d+ bytes>$/);
-  }
+test("Kimi dry-run display does not expose its argument-delivered prompt", () => {
+  const spec = getRuntimeAdapter("kimi").buildCommand({ ...baseRequest, runtime: "kimi" });
+  assert.equal(spec.args.includes(baseRequest.prompt), true);
+  assert.equal(spec.displayArgs.includes(baseRequest.prompt), false);
+  assert.match(spec.displayArgs.at(-1) ?? "", /^<prompt:\d+ bytes>$/);
+});
+
+test("Grok delivers prompts through a temporary file", () => {
+  const spec = getRuntimeAdapter("grok").buildCommand({ ...baseRequest, runtime: "grok" });
+  assert.equal(spec.args.includes(baseRequest.prompt), false);
+  assert.equal(spec.displayArgs.at(-1), "<prompt-file>");
+  assert.equal(spec.temporaryFiles?.[0]?.content, baseRequest.prompt);
 });
 
 test("stdin-capable adapters keep prompt out of process arguments", () => {

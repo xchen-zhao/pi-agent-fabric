@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import type { WriteStream } from "node:fs";
+import { mkdir, mkdtemp, open, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -50,15 +50,44 @@ function createLineConsumer(callback: ((line: string) => void) | undefined) {
   };
 }
 
+async function materializeTemporaryFiles(spec: CommandSpec): Promise<{ args: string[]; cleanup: () => Promise<void> }> {
+  if (!spec.temporaryFiles?.length) return { args: spec.args, cleanup: async () => undefined };
+
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "pi-agent-fabric-"));
+  try {
+    await Promise.all(spec.temporaryFiles.map(async (file) => {
+      if (!/^[-_.A-Za-z0-9]+$/.test(file.fileName)) throw new Error(`Unsafe temporary file name: ${file.fileName}`);
+      const filePath = path.join(tempDir, file.fileName);
+      await writeFile(filePath, file.content, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    }));
+    const replacements = new Map(spec.temporaryFiles.map((file) => [file.token, path.join(tempDir, file.fileName)]));
+    return {
+      args: spec.args.map((arg) => replacements.get(arg) ?? arg),
+      cleanup: () => rm(tempDir, { recursive: true, force: true }),
+    };
+  } catch (error) {
+    await rm(tempDir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
 export async function superviseExecution(
   spec: CommandSpec,
   options: SupervisorOptions = {},
 ): Promise<ProcessResult> {
   const startedAt = Date.now();
+  const materialized = await materializeTemporaryFiles(spec);
   const logDir = options.logDir ?? path.join(os.homedir(), ".local", "share", "pi-agent-fabric", "runs");
-  await mkdir(logDir, { recursive: true, mode: 0o700 });
   const fullOutputPath = path.join(logDir, `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID()}.log`);
-  const log = createWriteStream(fullOutputPath, { flags: "wx", mode: 0o600 });
+  let log: WriteStream;
+  try {
+    await mkdir(logDir, { recursive: true, mode: 0o700 });
+    const logHandle = await open(fullOutputPath, "wx", 0o600);
+    log = logHandle.createWriteStream();
+  } catch (error) {
+    await materialized.cleanup();
+    throw error;
+  }
   const stdout = new BoundedOutputBuffer({
     maxBytes: options.maxBytes ?? DEFAULT_MAX_BYTES,
     maxLines: options.maxLines ?? DEFAULT_MAX_LINES,
@@ -76,6 +105,7 @@ export async function superviseExecution(
     let aborted = false;
     let settled = false;
     let spawnError: string | undefined;
+    let logError: string | undefined;
     let timer: NodeJS.Timeout | undefined;
     let forceKillTimer: NodeJS.Timeout | undefined;
 
@@ -92,20 +122,25 @@ export async function superviseExecution(
       options.signal?.removeEventListener("abort", abortHandler);
       stdoutLines.flush();
       stderrLines.flush();
-      log.end(() => {
-        resolve({
-          stdout: stdout.content,
-          stderr: stderr.content,
-          exitCode,
-          signal,
-          timedOut,
-          aborted,
-          truncated: stdout.truncated || stderr.truncated,
-          fullOutputPath,
-          ...(spawnError ? { spawnError } : {}),
-          durationMs: Date.now() - startedAt,
+      const resolveAfterCleanup = (): void => {
+        void materialized.cleanup().finally(() => {
+          resolve({
+            stdout: stdout.content,
+            stderr: stderr.content,
+            exitCode,
+            signal,
+            timedOut,
+            aborted,
+            truncated: stdout.truncated || stderr.truncated,
+            fullOutputPath,
+            ...(spawnError ? { spawnError } : {}),
+            ...(logError ? { logError } : {}),
+            durationMs: Date.now() - startedAt,
+          });
         });
-      });
+      };
+      if (log.destroyed) resolveAfterCleanup();
+      else log.end(resolveAfterCleanup);
     };
 
     const abortHandler = (): void => {
@@ -113,8 +148,12 @@ export async function superviseExecution(
       requestTermination();
     };
 
+    log.on("error", (error) => {
+      logError = redactSecrets(`Audit log failed: ${error.message}`);
+    });
+
     try {
-      child = spawn(spec.command, spec.args, {
+      child = spawn(spec.command, materialized.args, {
         cwd: spec.cwd,
         shell: false,
         detached: process.platform !== "win32",

@@ -40,8 +40,8 @@ Pi 扩展中可使用：
 - 使用 `spawn(command, args, { shell: false })`，不经过 Shell 拼接。
 - Pi、Claude Code 和 Codex 的 Prompt 通过 stdin 传递，不出现在进程参数中。
 - 自动化命令默认关闭或忽略非必要的用户扩展能力：Pi 禁用 Extensions/Skills/Templates，Claude 使用 Safe Mode，Codex 忽略用户配置和 Rules，Grok 禁用 Memory/Web Search/Subagents。项目上下文继承策略将在统一 Executor 中显式定义，不能依赖隐式插件副作用。
-- Grok 和 Kimi 当前 CLI 模式需要参数传递 Prompt；Dry Run 会将其替换为长度占位符。真实执行前需继续评估 Grok 的 prompt-file 与 Kimi ACP，降低进程列表泄漏风险。
-- Kimi 的 `--prompt` 与 `--plan` 不能同时使用，因此直接 CLI Prompt 模式不具备可接受的强制只读边界；在 ACP 或外部沙箱完成前，不应开放自动执行。
+- Grok 已改用权限为 `0600` 的临时 Prompt File，任务完成、失败、超时或取消后均清理，不再把 Prompt 放入子进程参数。
+- Kimi 当前 CLI Prompt 模式仍需要参数传递 Prompt；Dry Run 会将其替换为长度占位符。Kimi 的 `--prompt` 与 `--plan` 不能同时使用，因此直接 CLI Prompt 模式不具备可接受的强制只读边界；ACP 只能改善协议权限，不能替代 OS 沙箱，在双重边界完成前不开放自动执行。
 - 日志默认写入 `~/.local/share/pi-agent-fabric/runs/`，目录权限为 `0700`、文件权限为 `0600`。
 - 日志与返回输出均先执行基础 Token/密钥脱敏。
 - 上下文输出默认最多保留 50KB/2000 行，完整的脱敏输出保存在日志文件中。
@@ -49,8 +49,8 @@ Pi 扩展中可使用：
 
 ## 下一步
 
-1. 完善工具调用、失败和中断事件 Fixture。
-2. 为 Kimi 评估 ACP 或外部沙箱执行路径。
-3. 将认证、限流、额度不足和模型不可用归一化为稳定错误分类。
-4. 设计本地 Usage Ledger，但不把推断数据伪装成精确额度。
-5. 在统一执行稳定后再增加供父 Agent 调用的委派工具。
+1. 使用真实 Fixture 完善 Claude、Codex 和 Grok 的工具调用事件。
+2. 为 Kimi 实现 ACP 权限层与外部 OS 沙箱的双重保护。
+3. 增加 Runtime Health Snapshot 与可解释的安全 fallback。
+4. 为 Usage Ledger 增加保留期、导出和删除能力。
+5. 在路由稳定后再增加供父 Agent 调用的委派工具。

@@ -41,4 +41,4 @@
 
 ## 当前阶段
 
-V1 Runtime Execution：已实现内部 Adapter 协议、Process Supervisor、统一 Executor、Dry Run、显式 Execute 和四个 Runtime 的端到端只读复测。Kimi 因无法在 Prompt 模式强制只读而保持禁用。任何额外的额度消耗测试仍须说明必要性，避免重复消耗。
+V1.1 Runtime Hardening 已完成：Grok 使用安全临时 Prompt File，Usage Ledger 和错误/Quota Signal 已落地，Kimi ACP 安全边界已评估。下一阶段是 V1.2 Runtime Health 与可解释 fallback。任何额外的额度消耗测试仍须说明必要性，避免重复消耗。

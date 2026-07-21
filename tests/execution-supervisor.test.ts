@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { access, mkdtemp, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -52,10 +52,24 @@ test("supervisor responds to AbortSignal", async () => {
 
 test("supervisor redacts returned output and persisted logs", async () => {
   const logDir = await mkdtemp(path.join(os.tmpdir(), "fabric-test-"));
-  const result = await superviseExecution(nodeSpec("console.log('authorization: Bearer secret-token-value')"), { logDir });
-  assert.doesNotMatch(result.stdout, /secret-token-value/);
+  const result = await superviseExecution(nodeSpec("console.log('authorization: Bearer fixture-credential-value')"), { logDir });
+  assert.doesNotMatch(result.stdout, /fixture-credential-value/);
   assert.ok(result.fullOutputPath);
   const log = await readFile(result.fullOutputPath, "utf8");
-  assert.doesNotMatch(log, /secret-token-value/);
+  assert.doesNotMatch(log, /fixture-credential-value/);
   assert.match(log, /REDACTED/);
+});
+
+test("supervisor materializes private prompt files and removes them after execution", async () => {
+  const logDir = await mkdtemp(path.join(os.tmpdir(), "fabric-test-"));
+  const token = "__PROMPT_FILE__";
+  const spec = nodeSpec("const fs=require('node:fs'); console.log(process.argv[1]); console.log(fs.readFileSync(process.argv[1],'utf8'))");
+  spec.args.push(token);
+  spec.displayArgs.push("<prompt-file>");
+  spec.temporaryFiles = [{ token, content: "private prompt", fileName: "prompt.md" }];
+  const result = await superviseExecution(spec, { logDir });
+  const [promptPath, content] = result.stdout.trim().split("\n");
+  assert.equal(content, "private prompt");
+  assert.ok(promptPath);
+  await assert.rejects(access(promptPath));
 });

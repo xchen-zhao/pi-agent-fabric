@@ -15,6 +15,19 @@ export class PiAdapter extends BaseRuntimeAdapter {
       const delta = assistantEvent?.type === "text_delta" ? stringValue(assistantEvent.delta) : undefined;
       return delta === undefined ? [] : [textDelta(delta)];
     }
+    if (type === "tool_execution_start") {
+      const name = stringValue(event.toolName);
+      return name === undefined ? [] : [{ type: "tool.started", name, timestamp: new Date().toISOString() }];
+    }
+    if (type === "tool_execution_end") {
+      const name = stringValue(event.toolName);
+      return name === undefined ? [] : [{
+        type: "tool.finished",
+        name,
+        isError: event.isError === true,
+        timestamp: new Date().toISOString(),
+      }];
+    }
     if (type === "message_end") {
       const message = record(event.message);
       if (message?.role !== "assistant") return [];

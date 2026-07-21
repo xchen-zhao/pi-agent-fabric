@@ -8,9 +8,10 @@ import type { AgentEvent, ExecutionRequest } from "../core/execution-types.js";
 import { formatDetailedReport, formatRuntimeTable } from "../core/format.js";
 import { RUNTIME_IDS, type RuntimeId } from "../core/types.js";
 import { initialQuotaSnapshot } from "../quota/broker.js";
+import { UsageLedger, type UsageSummary } from "../usage/ledger.js";
 
 function usage(): void {
-  console.log(`Usage: fabric <command> [options]\n\nCommands:\n  doctor                         Runtime 安装、版本和能力诊断\n  agents                         列出可用 Agent Runtime\n  quota                          显示安全的额度探测结果\n  run --runtime <id>             执行或预览统一只读 Agent 任务\n\nRun options:\n  --prompt <text|->              任务提示词；- 表示从 stdin 读取\n  --prompt-file <path>           从 UTF-8 文件读取任务提示词\n  --cwd <path>                   工作目录，默认为当前目录\n  --read-only                    只读执行模式（当前唯一模式）\n  --timeout-seconds <seconds>    超时，默认 600 秒\n  --dry-run                      只展示执行计划，不启动 Agent\n  --execute                      明确启动 Agent；会消耗对应额度\n  --json                         输出归一化 JSONL 事件和最终结果`);
+  console.log(`Usage: fabric <command> [options]\n\nCommands:\n  doctor                         Runtime 安装、版本和能力诊断\n  agents                         列出可用 Agent Runtime\n  quota                          显示安全的额度探测结果\n  usage [--recent <n>]           查看本地聚合 Usage 和最近运行\n  run --runtime <id>             执行或预览统一只读 Agent 任务\n\nRun options:\n  --prompt <text|->              任务提示词；- 表示从 stdin 读取\n  --prompt-file <path>           从 UTF-8 文件读取任务提示词\n  --cwd <path>                   工作目录，默认为当前目录\n  --read-only                    只读执行模式（当前唯一模式）\n  --timeout-seconds <seconds>    超时，默认 600 秒\n  --dry-run                      只展示执行计划，不启动 Agent\n  --execute                      明确启动 Agent；会消耗对应额度\n  --json                         输出归一化 JSONL 事件和最终结果`);
 }
 
 function optionValue(args: string[], name: string): string | undefined {
@@ -57,6 +58,24 @@ async function readPrompt(args: string[]): Promise<string> {
   return prompt;
 }
 
+function formatUsageSummary(rows: UsageSummary[]): string {
+  if (rows.length === 0) return "No recorded Agent runs.";
+  const header = "Runtime      Runs  OK  Failed  Input     Output    Cache Read  Cache Write  Cost USD";
+  const divider = "-----------  ----  --  ------  --------  --------  ----------  -----------  --------";
+  const lines = rows.map((row) => [
+    row.runtime.padEnd(11),
+    String(row.runs).padStart(4),
+    String(row.completed).padStart(2),
+    String(row.failed).padStart(6),
+    String(row.inputTokens).padStart(8),
+    String(row.outputTokens).padStart(8),
+    String(row.cacheReadTokens).padStart(10),
+    String(row.cacheWriteTokens).padStart(11),
+    row.costUsd.toFixed(4).padStart(8),
+  ].join("  "));
+  return [header, divider, ...lines].join("\n");
+}
+
 function printTextResult(result: Awaited<ReturnType<typeof executeAgent>>): void {
   if (result.text && !result.text.endsWith("\n")) process.stdout.write("\n");
   console.log(`Status: ${result.status}`);
@@ -91,7 +110,18 @@ async function runAgent(args: string[], json: boolean): Promise<void> {
     if (json) console.log(JSON.stringify(event));
     else if (event.type === "message.delta") process.stdout.write(event.text);
   };
+  const startedAt = new Date();
   const result = await executeAgent(request, { onEvent });
+  try {
+    const ledger = UsageLedger.open();
+    try {
+      ledger.record(request, result, startedAt);
+    } finally {
+      ledger.close();
+    }
+  } catch (error) {
+    console.error(`Warning: failed to record usage: ${error instanceof Error ? error.message : String(error)}`);
+  }
   if (json) console.log(JSON.stringify({ type: "run.result", result }));
   else printTextResult(result);
   if (result.status === "failed") process.exitCode = 1;
@@ -108,6 +138,28 @@ async function main(): Promise<void> {
 
   if (command === "run") {
     await runAgent(args, json);
+    return;
+  }
+
+  if (command === "usage") {
+    const ledger = UsageLedger.open();
+    try {
+      const summaries = ledger.summaries();
+      const recentValue = optionValue(args, "--recent");
+      const recent = recentValue === undefined ? [] : ledger.recent(Number(recentValue));
+      if (json) console.log(JSON.stringify({ summaries, recent }, null, 2));
+      else {
+        console.log(formatUsageSummary(summaries));
+        if (recent.length > 0) {
+          console.log("\nRecent runs:");
+          for (const run of recent) {
+            console.log(`${run.finishedAt}  ${run.runtime}  ${run.status}  ${run.durationMs}ms${run.errorCategory ? `  ${run.errorCategory}` : ""}`);
+          }
+        }
+      }
+    } finally {
+      ledger.close();
+    }
     return;
   }
 

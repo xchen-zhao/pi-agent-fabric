@@ -35,7 +35,7 @@ Workspace Manager
 
 - V0：Runtime Discovery 和只读 Doctor。
 - V1：统一 Runtime 执行协议、单 Agent 运行、取消和输出归一化。
-- V1.1：健康状态、错误分类和本地 Usage Ledger。
+- V1.1：安全 Prompt 通道、健康状态、错误分类和本地 Usage Ledger。
 - V1.2：可用性路由和安全 fallback。
 - V2：额度感知调度、并发租约和失败接力。
 - V3：任务 DAG、worktree、Review Gate 和恢复机制。
