@@ -17,6 +17,8 @@ export async function createDryRunPlan(request: ExecutionRequest): Promise<DryRu
     outputFormat: command.outputFormat,
     timeoutMs: command.timeoutMs,
     promptDelivery: command.stdin === undefined ? "argument" : "stdin",
+    readOnlyEnforcement: command.readOnlyEnforcement,
+    ...(command.safetyNote ? { safetyNote: command.safetyNote } : {}),
   };
 }
 
@@ -30,6 +32,8 @@ export function formatDryRunPlan(plan: DryRunPlan): string {
     `Prompt delivery: ${plan.promptDelivery}`,
     `Output: ${plan.outputFormat}`,
     `Timeout: ${Math.round(plan.timeoutMs / 1_000)}s`,
+    `Read-only enforcement: ${plan.readOnlyEnforcement}`,
+    ...(plan.safetyNote ? [`Safety note: ${plan.safetyNote}`] : []),
     "Dry run: no Agent process was started and no model quota was consumed.",
   ].join("\n");
 }

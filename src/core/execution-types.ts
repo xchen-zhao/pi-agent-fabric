@@ -19,6 +19,8 @@ export interface CommandSpec {
   stdin?: string;
   outputFormat: OutputFormat;
   timeoutMs: number;
+  readOnlyEnforcement: "native" | "best-effort";
+  safetyNote?: string;
 }
 
 export type AgentEvent =
@@ -26,7 +28,22 @@ export type AgentEvent =
   | { type: "message.delta"; text: string; timestamp: string }
   | { type: "tool.started"; name: string; timestamp: string }
   | { type: "tool.finished"; name: string; isError: boolean; timestamp: string }
-  | { type: "usage.updated"; inputTokens?: number; outputTokens?: number; timestamp: string }
+  | {
+      type: "usage.updated";
+      inputTokens?: number;
+      outputTokens?: number;
+      cacheReadTokens?: number;
+      cacheWriteTokens?: number;
+      costUsd?: number;
+      timestamp: string;
+    }
+  | {
+      type: "quota.updated";
+      status: "available" | "constrained" | "cooldown" | "exhausted" | "unknown";
+      confidence: "reported";
+      resetAt?: string;
+      timestamp: string;
+    }
   | { type: "run.completed"; timestamp: string }
   | { type: "run.failed"; category: RuntimeErrorCategory; message: string; timestamp: string };
 
@@ -69,4 +86,6 @@ export interface DryRunPlan {
   outputFormat: OutputFormat;
   timeoutMs: number;
   promptDelivery: "stdin" | "argument";
+  readOnlyEnforcement: "native" | "best-effort";
+  safetyNote?: string;
 }

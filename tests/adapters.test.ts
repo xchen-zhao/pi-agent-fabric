@@ -28,6 +28,12 @@ test("all adapters build read-only, non-shell command specs", () => {
   }
 });
 
+test("Kimi declares best-effort read-only enforcement", () => {
+  const spec = getRuntimeAdapter("kimi").buildCommand({ ...baseRequest, runtime: "kimi" });
+  assert.equal(spec.readOnlyEnforcement, "best-effort");
+  assert.match(spec.safetyNote ?? "", /ACP|sandbox/);
+});
+
 test("dry-run display does not expose argument-delivered prompts", () => {
   for (const id of ["grok", "kimi"] as const) {
     const spec = getRuntimeAdapter(id).buildCommand({ ...baseRequest, runtime: id });

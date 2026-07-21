@@ -9,7 +9,7 @@ export class KimiAdapter extends BaseRuntimeAdapter {
   }
 
   buildCommand(request: ExecutionRequest): CommandSpec {
-    const args = ["--plan", "--output-format", "stream-json", "--prompt", request.prompt];
+    const args = ["--output-format", "stream-json", "--prompt", request.prompt];
     const displayArgs = [...args];
     displayArgs[displayArgs.length - 1] = promptPlaceholder(request.prompt);
     return {
@@ -19,6 +19,8 @@ export class KimiAdapter extends BaseRuntimeAdapter {
       cwd: request.cwd,
       outputFormat: "jsonl",
       timeoutMs: request.timeoutMs,
+      readOnlyEnforcement: "best-effort",
+      safetyNote: "Kimi prompt mode cannot be combined with --plan; enforce read-only through ACP or an external sandbox before live automation.",
     };
   }
 }

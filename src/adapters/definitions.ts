@@ -72,7 +72,7 @@ export const RUNTIME_DEFINITIONS: RuntimeDefinition[] = [
     versionArgs: ["--version"],
     capabilities: {
       headless: true,
-      structuredOutput: false,
+      structuredOutput: true,
       streamingOutput: true,
       resume: true,
       worktree: false,

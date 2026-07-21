@@ -14,6 +14,7 @@ function nodeSpec(script: string, timeoutMs = 2_000): CommandSpec {
     cwd: process.cwd(),
     outputFormat: "text",
     timeoutMs,
+    readOnlyEnforcement: "native",
   };
 }
 

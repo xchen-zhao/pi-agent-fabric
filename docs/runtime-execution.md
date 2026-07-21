@@ -7,10 +7,11 @@
 ## 当前边界
 
 - 已定义内部实验版 `AgentRuntimeAdapter`，尚不承诺公开 API 稳定性。
-- 已实现五个 Runtime 的只读命令构建器。
+- 已实现五个 Runtime 的命令构建器；Pi、Claude、Codex 和 Grok 提供原生只读约束，Kimi 直接 Prompt 模式目前只能标记为 `best-effort`。
 - 已实现超时、取消、进程组终止、输出限制、日志和基础脱敏的 Process Supervisor。
-- `fabric run` 当前强制要求 `--read-only --dry-run`，不会启动 Agent 或消耗模型额度。
-- 尚未启用真实执行和各 Runtime 的事件解析。
+- 已通过最小真实 Smoke Test 验证 Pi、Claude、Codex 和 Grok 的 JSONL；Kimi 准确识别到当前计费周期额度已耗尽。
+- 已为四个成功 Runtime 建立脱敏 Fixture 和基础事件 Parser，并解析 Claude 报告的限流窗口。
+- `fabric run` 当前仍强制要求 `--read-only --dry-run`，不会启动 Agent 或消耗模型额度。
 
 ## Dry Run
 
@@ -33,7 +34,9 @@ Pi 扩展中可使用：
 
 - 使用 `spawn(command, args, { shell: false })`，不经过 Shell 拼接。
 - Pi、Claude Code 和 Codex 的 Prompt 通过 stdin 传递，不出现在进程参数中。
+- 自动化命令默认关闭或忽略非必要的用户扩展能力：Pi 禁用 Extensions/Skills/Templates，Claude 使用 Safe Mode，Codex 忽略用户配置和 Rules，Grok 禁用 Memory/Web Search/Subagents。项目上下文继承策略将在统一 Executor 中显式定义，不能依赖隐式插件副作用。
 - Grok 和 Kimi 当前 CLI 模式需要参数传递 Prompt；Dry Run 会将其替换为长度占位符。真实执行前需继续评估 Grok 的 prompt-file 与 Kimi ACP，降低进程列表泄漏风险。
+- Kimi 的 `--prompt` 与 `--plan` 不能同时使用，因此直接 CLI Prompt 模式不具备可接受的强制只读边界；在 ACP 或外部沙箱完成前，不应开放自动执行。
 - 日志默认写入 `~/.local/share/pi-agent-fabric/runs/`，目录权限为 `0700`、文件权限为 `0600`。
 - 日志与返回输出均先执行基础 Token/密钥脱敏。
 - 上下文输出默认最多保留 50KB/2000 行，完整的脱敏输出保存在日志文件中。
@@ -41,7 +44,8 @@ Pi 扩展中可使用：
 
 ## 下一步
 
-1. 为五种 JSON/JSONL 流建立 Fixture 和事件 Parser。
-2. 通过用户明确确认的最小真实请求采集输出格式。
-3. 启用单 Runtime 只读执行。
-4. 将认证、限流、额度不足和模型不可用归一化为稳定错误分类。
+1. 完善工具调用、失败和中断事件 Fixture。
+2. 增加统一 Executor，将 Supervisor 与 Adapter Parser 串联。
+3. 启用 Pi、Claude、Codex 和 Grok 的单 Runtime 只读执行。
+4. 为 Kimi 评估 ACP 或外部沙箱执行路径。
+5. 将认证、限流、额度不足和模型不可用归一化为稳定错误分类。
