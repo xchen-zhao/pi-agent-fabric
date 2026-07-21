@@ -16,7 +16,7 @@
 
 ## 当前状态
 
-当前为 **V0 Runtime Discovery**：只执行 `--version` 等无副作用命令，不发送模型请求，不消耗模型额度，不读取认证文件内容。
+当前处于 **V1 Runtime Execution**：已完成 Runtime Discovery、内部 Adapter 协议、五种只读命令计划、Process Supervisor 和 Dry Run。`fabric run` 暂不启动真实 Agent，不发送模型请求，也不消耗模型额度。
 
 ## 开发
 
@@ -33,6 +33,12 @@ npm run doctor
 node dist/src/cli/index.js doctor
 node dist/src/cli/index.js agents
 node dist/src/cli/index.js quota
+node dist/src/cli/index.js run \
+  --runtime codex \
+  --prompt "Analyze this project" \
+  --cwd . \
+  --read-only \
+  --dry-run
 ```
 
 ## 作为 Pi 扩展试运行
@@ -46,6 +52,7 @@ pi -e ./src/extension/index.ts
 ```text
 /fabric-agents
 /fabric-quota
+/fabric-dry-run codex Analyze this project
 ```
 
 ## 安全原则
@@ -55,4 +62,4 @@ pi -e ./src/extension/index.ts
 - 无法精确查询的额度明确标记为 `unknown` 或 `inferred`。
 - 外部 Agent 自动执行将在后续版本加入超时、输出截断、工作区隔离和配额租约。
 
-项目的 North Star 和不可妥协原则见 [`docs/vision-and-principles.md`](docs/vision-and-principles.md)，架构见 [`docs/architecture.md`](docs/architecture.md)。
+项目的 North Star 和不可妥协原则见 [`docs/vision-and-principles.md`](docs/vision-and-principles.md)，架构见 [`docs/architecture.md`](docs/architecture.md)，V1 执行设计见 [`docs/runtime-execution.md`](docs/runtime-execution.md)。

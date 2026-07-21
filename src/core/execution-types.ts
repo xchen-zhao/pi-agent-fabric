@@ -1,0 +1,72 @@
+import type { RuntimeId } from "./types.js";
+
+export type ExecutionMode = "read-only";
+export type OutputFormat = "json" | "jsonl" | "text";
+
+export interface ExecutionRequest {
+  runtime: RuntimeId;
+  prompt: string;
+  cwd: string;
+  mode: ExecutionMode;
+  timeoutMs: number;
+}
+
+export interface CommandSpec {
+  command: string;
+  args: string[];
+  displayArgs: string[];
+  cwd: string;
+  stdin?: string;
+  outputFormat: OutputFormat;
+  timeoutMs: number;
+}
+
+export type AgentEvent =
+  | { type: "run.started"; runtime: RuntimeId; timestamp: string }
+  | { type: "message.delta"; text: string; timestamp: string }
+  | { type: "tool.started"; name: string; timestamp: string }
+  | { type: "tool.finished"; name: string; isError: boolean; timestamp: string }
+  | { type: "usage.updated"; inputTokens?: number; outputTokens?: number; timestamp: string }
+  | { type: "run.completed"; timestamp: string }
+  | { type: "run.failed"; category: RuntimeErrorCategory; message: string; timestamp: string };
+
+export type RuntimeErrorCategory =
+  | "aborted"
+  | "authentication"
+  | "executable-not-found"
+  | "invalid-output"
+  | "quota-exhausted"
+  | "rate-limited"
+  | "spawn-failed"
+  | "timeout"
+  | "unknown";
+
+export interface ProcessResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+  aborted: boolean;
+  truncated: boolean;
+  fullOutputPath?: string;
+  durationMs: number;
+}
+
+export interface RuntimeError {
+  category: RuntimeErrorCategory;
+  message: string;
+  retryable: boolean;
+  retryAfterMs?: number;
+}
+
+export interface DryRunPlan {
+  runtime: RuntimeId;
+  executable: string;
+  args: string[];
+  cwd: string;
+  mode: ExecutionMode;
+  outputFormat: OutputFormat;
+  timeoutMs: number;
+  promptDelivery: "stdin" | "argument";
+}

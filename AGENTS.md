@@ -39,4 +39,4 @@
 
 ## 当前阶段
 
-V0 Runtime Discovery：只检测命令、版本、无副作用能力和认证配置迹象，不发送模型请求，不消耗额度。
+V1 Runtime Execution：已实现内部 Adapter 协议、只读命令计划、Process Supervisor 和 Dry Run。真实 Agent 执行尚未开放；任何会消耗额度的 Smoke Test 必须先获得用户明确确认。
