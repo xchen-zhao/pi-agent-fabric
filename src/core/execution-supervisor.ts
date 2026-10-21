@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { WriteStream } from "node:fs";
-import { mkdir, mkdtemp, open, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, open, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -50,10 +50,48 @@ function createLineConsumer(callback: ((line: string) => void) | undefined) {
   };
 }
 
+const TEMP_PREFIX = "pi-agent-fabric-";
+
+/**
+ * Best-effort removal of prompt temp directories left behind when a previous host
+ * process was killed (SIGKILL, power loss). Only touches real directories named
+ * `pi-agent-fabric-*` directly under the temp root, owned by the current user, and
+ * older than `maxAgeMs`. Returns the number of removed directories.
+ */
+export async function cleanupStaleTempDirs(
+  maxAgeMs = 24 * 60 * 60_000,
+  tempRoot = os.tmpdir(),
+  now = Date.now(),
+): Promise<number> {
+  let entries: string[];
+  try {
+    entries = await readdir(tempRoot);
+  } catch {
+    return 0;
+  }
+  const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+  let removed = 0;
+  for (const name of entries) {
+    if (!name.startsWith(TEMP_PREFIX)) continue;
+    const fullPath = path.join(tempRoot, name);
+    try {
+      const info = await lstat(fullPath);
+      if (!info.isDirectory() || info.isSymbolicLink()) continue;
+      if (uid !== undefined && info.uid !== uid) continue;
+      if (now - info.mtimeMs < maxAgeMs) continue;
+      await rm(fullPath, { recursive: true, force: true });
+      removed += 1;
+    } catch {
+      // 清理失败不影响本次执行。
+    }
+  }
+  return removed;
+}
+
 async function materializeTemporaryFiles(spec: CommandSpec): Promise<{ args: string[]; cleanup: () => Promise<void> }> {
   if (!spec.temporaryFiles?.length) return { args: spec.args, cleanup: async () => undefined };
 
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "pi-agent-fabric-"));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_PREFIX));
   try {
     await Promise.all(spec.temporaryFiles.map(async (file) => {
       if (!/^[-_.A-Za-z0-9]+$/.test(file.fileName)) throw new Error(`Unsafe temporary file name: ${file.fileName}`);
