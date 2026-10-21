@@ -1,6 +1,6 @@
 {
   "name": "pi-agent-fabric",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Quota-aware local agent orchestration for Pi, Claude Code, Codex, Grok, and Kimi Code",
   "license": "MIT",
   "author": "xchen-zhao",
