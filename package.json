@@ -2,8 +2,17 @@
   "name": "pi-agent-fabric",
   "version": "0.1.0",
   "description": "Quota-aware local agent orchestration for Pi, Claude Code, Codex, Grok, and Kimi Code",
+  "license": "MIT",
+  "author": "xchen-zhao",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xchen-zhao/pi-agent-fabric.git"
+  },
+  "homepage": "https://github.com/xchen-zhao/pi-agent-fabric#readme",
+  "bugs": {
+    "url": "https://github.com/xchen-zhao/pi-agent-fabric/issues"
+  },
   "type": "module",
-  "private": true,
   "engines": {
     "node": ">=24"
   },
@@ -32,7 +41,20 @@
   "keywords": [
     "pi-package",
     "agent-orchestration",
-    "multi-agent"
+    "multi-agent",
+    "coding-agents",
+    "claude-code",
+    "codex",
+    "grok",
+    "quota",
+    "cli",
+    "local-first"
   ],
-  "license": "UNLICENSED"
+  "files": [
+    "dist/src",
+    "src",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ]
 }

@@ -87,3 +87,55 @@ test("usage ledger creates private database files", async () => {
   const mode = (await stat(filePath)).mode & 0o777;
   assert.equal(mode, 0o600);
 });
+
+test("usage ledger stores retry-after and returns quota signals since a time", () => {
+  const ledger = UsageLedger.open(":memory:");
+  try {
+    ledger.record(request, result, new Date("2026-01-01T00:00:00.000Z"), new Date("2026-01-01T00:00:01.000Z"));
+    ledger.record(request, {
+      ...result,
+      status: "failed",
+      error: { category: "rate-limited", message: "limited", retryable: true, retryAfterMs: 30_000 },
+    }, new Date("2026-01-02T00:00:00.000Z"), new Date("2026-01-02T00:00:01.000Z"));
+    const signals = ledger.quotaSignals(new Date("2026-01-01T12:00:00.000Z"));
+    assert.equal(signals.length, 1);
+    assert.deepEqual(signals[0], {
+      runtime: "codex",
+      status: "failed",
+      finishedAt: "2026-01-02T00:00:01.000Z",
+      errorCategory: "rate-limited",
+      retryAfterMs: 30_000,
+    });
+    assert.equal(JSON.stringify(signals).includes(request.prompt), false);
+  } finally {
+    ledger.close();
+  }
+});
+
+test("usage ledger migrates schema v1 databases in place", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const directory = await mkdtemp(path.join(os.tmpdir(), "fabric-ledger-v1-"));
+  const filePath = path.join(directory, "fabric.db");
+  const db = new DatabaseSync(filePath);
+  db.exec(`
+    CREATE TABLE agent_runs (
+      id TEXT PRIMARY KEY, runtime TEXT NOT NULL, mode TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('completed', 'failed')),
+      started_at TEXT NOT NULL, finished_at TEXT NOT NULL, duration_ms INTEGER NOT NULL,
+      input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER,
+      cost_usd REAL, error_category TEXT, quota_status TEXT, quota_confidence TEXT, quota_reset_at TEXT, log_path TEXT
+    );
+    INSERT INTO agent_runs (id, runtime, mode, status, started_at, finished_at, duration_ms)
+      VALUES ('old', 'pi', 'read-only', 'completed', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:01.000Z', 1000);
+    PRAGMA user_version = 1;
+  `);
+  db.close();
+  const ledger = UsageLedger.open(filePath);
+  try {
+    assert.equal(ledger.summaries()[0]?.runs, 1);
+    ledger.record(request, { ...result, status: "failed", error: { category: "rate-limited", message: "x", retryable: true, retryAfterMs: 5_000 } }, new Date(), new Date());
+    assert.equal(ledger.quotaSignals(new Date("2025-01-01T00:00:00.000Z"))[0]?.retryAfterMs, 5_000);
+  } finally {
+    ledger.close();
+  }
+});

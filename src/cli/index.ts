@@ -7,11 +7,39 @@ import { executeAgent } from "../core/executor.js";
 import type { AgentEvent, ExecutionRequest } from "../core/execution-types.js";
 import { formatDetailedReport, formatRuntimeTable } from "../core/format.js";
 import { RUNTIME_IDS, type RuntimeId } from "../core/types.js";
-import { initialQuotaSnapshot } from "../quota/broker.js";
+import type { QuotaDerivationOptions } from "../quota/broker.js";
+import { parsePriority, selectRuntime, type RouteDecision } from "../quota/router.js";
+import { loadQuotaSnapshots } from "../quota/state.js";
+import type { QuotaSnapshot } from "../quota/types.js";
+import { cleanupStaleTempDirs } from "../core/execution-supervisor.js";
 import { UsageLedger, type UsageSummary } from "../usage/ledger.js";
 
 function usage(): void {
-  console.log(`Usage: fabric <command> [options]\n\nCommands:\n  doctor                         Runtime 安装、版本和能力诊断\n  agents                         列出可用 Agent Runtime\n  quota                          显示安全的额度探测结果\n  usage [--recent <n>]           查看本地聚合 Usage 和最近运行\n  run --runtime <id>             执行或预览统一只读 Agent 任务\n\nRun options:\n  --prompt <text|->              任务提示词；- 表示从 stdin 读取\n  --prompt-file <path>           从 UTF-8 文件读取任务提示词\n  --cwd <path>                   工作目录，默认为当前目录\n  --read-only                    只读执行模式（当前唯一模式）\n  --timeout-seconds <seconds>    超时，默认 600 秒\n  --dry-run                      只展示执行计划，不启动 Agent\n  --execute                      明确启动 Agent；会消耗对应额度\n  --json                         输出归一化 JSONL 事件和最终结果`);
+  console.log(`Usage: fabric <command> [options]
+
+Commands:
+  doctor                         Runtime install, version and capability diagnostics
+  agents                         List detected Agent runtimes
+  quota                          Show quota state derived from the local Usage Ledger
+  usage [--recent <n>]           Show aggregated local usage and recent runs
+  run --runtime <id|auto>        Execute or preview a unified read-only Agent task
+
+Run options:
+  --runtime auto                 Pick an eligible runtime by quota state + priority
+  --priority <ids>               Comma-separated order for auto, e.g. codex,claude,pi
+                                 (default: env PI_AGENT_FABRIC_PRIORITY or pi,claude,codex,grok)
+  --prompt <text|->              Task prompt; - reads from stdin
+  --prompt-file <path>           Read the prompt from a UTF-8 file
+  --cwd <path>                   Working directory, defaults to the current directory
+  --read-only                    Read-only execution (the only mode today; required)
+  --timeout-seconds <seconds>    Timeout, default 600 seconds
+  --dry-run                      Show the execution plan without starting an Agent
+  --execute                      Actually start the Agent; consumes that runtime's quota
+  --json                         Emit normalized JSONL events and the final result
+
+Quota options (quota, run --runtime auto):
+  --cooldown-minutes <n>         Cooldown after a rate-limit signal without retry-after (default 15)
+  --quota-cooldown-minutes <n>   Cooldown after an exhausted-quota or auth signal (default 60)`);
 }
 
 function optionValue(args: string[], name: string): string | undefined {
@@ -22,9 +50,47 @@ function optionValue(args: string[], name: string): string | undefined {
   return value;
 }
 
+function parsePositiveMinutes(value: string | undefined, name: string): number | undefined {
+  if (value === undefined) return undefined;
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes <= 0) throw new Error(`${name} must be a positive number`);
+  return Math.round(minutes * 60_000);
+}
+
+function quotaOptions(args: string[]): QuotaDerivationOptions {
+  const rate = parsePositiveMinutes(optionValue(args, "--cooldown-minutes"), "--cooldown-minutes");
+  const quota = parsePositiveMinutes(optionValue(args, "--quota-cooldown-minutes"), "--quota-cooldown-minutes");
+  return {
+    ...(rate === undefined ? {} : { rateLimitCooldownMs: rate }),
+    ...(quota === undefined ? {} : { quotaCooldownMs: quota, authCooldownMs: quota }),
+  };
+}
+
+function formatQuotaTable(snapshots: QuotaSnapshot[]): string {
+  const header = "Runtime      State      Status        Confidence  Cooldown Until             Note";
+  const divider = "-----------  ---------  ------------  ----------  ------------------------  ------------------------";
+  const lines = snapshots.map((snapshot) => [
+    snapshot.runtime.padEnd(11),
+    (snapshot.state ?? "unknown").padEnd(9),
+    snapshot.status.padEnd(12),
+    snapshot.confidence.padEnd(10),
+    (snapshot.cooldownUntil ?? "-").padEnd(24),
+    snapshot.note ?? "-",
+  ].join("  "));
+  return [header, divider, ...lines].join("\n");
+}
+
+async function routeAuto(args: string[]): Promise<RouteDecision> {
+  const priority = parsePriority(optionValue(args, "--priority") ?? process.env.PI_AGENT_FABRIC_PRIORITY);
+  const runtimes = await discoverRuntimes();
+  const { snapshots, warning } = loadQuotaSnapshots(runtimes, quotaOptions(args));
+  if (warning) console.error(`Warning: ${warning}`);
+  return selectRuntime(runtimes, snapshots, priority);
+}
+
 function parseRuntime(value: string | undefined): RuntimeId {
   if (!value || !RUNTIME_IDS.includes(value as RuntimeId)) {
-    throw new Error(`Invalid --runtime. Expected one of: ${RUNTIME_IDS.join(", ")}`);
+    throw new Error(`Invalid --runtime. Expected auto or one of: ${RUNTIME_IDS.join(", ")}`);
   }
   return value as RuntimeId;
 }
@@ -92,8 +158,21 @@ async function runAgent(args: string[], json: boolean): Promise<void> {
   if (dryRun === execute) throw new Error("Use exactly one of --dry-run or --execute");
   if (!args.includes("--read-only")) throw new Error("V1 requires --read-only");
 
+  const runtimeValue = optionValue(args, "--runtime");
+  let runtime: RuntimeId;
+  let route: RouteDecision | undefined;
+  if (runtimeValue === "auto") {
+    route = await routeAuto(args);
+    if (!route.selected) throw new Error(route.reason);
+    runtime = route.selected;
+    if (json) console.log(JSON.stringify({ type: "route.selected", runtime, reason: route.reason, candidates: route.candidates }));
+    else console.error(`Auto-selected runtime: ${route.reason}`);
+  } else {
+    runtime = parseRuntime(runtimeValue);
+  }
+
   const request: ExecutionRequest = {
-    runtime: parseRuntime(optionValue(args, "--runtime")),
+    runtime,
     prompt: await readPrompt(args),
     cwd: path.resolve(optionValue(args, "--cwd") ?? process.cwd()),
     mode: "read-only",
@@ -110,6 +189,7 @@ async function runAgent(args: string[], json: boolean): Promise<void> {
     if (json) console.log(JSON.stringify(event));
     else if (event.type === "message.delta") process.stdout.write(event.text);
   };
+  await cleanupStaleTempDirs();
   const startedAt = new Date();
   const result = await executeAgent(request, { onEvent });
   try {
@@ -173,19 +253,9 @@ async function main(): Promise<void> {
     return;
   }
   if (command === "quota") {
-    const snapshots = runtimes.map(initialQuotaSnapshot);
-    if (json) {
-      console.log(JSON.stringify(snapshots, null, 2));
-    } else {
-      console.log("Runtime      Status        Confidence  Note");
-      console.log("-----------  ------------  ----------  ------------------------");
-      for (const snapshot of snapshots) {
-        const runtime = snapshot.runtime.padEnd(11);
-        const status = snapshot.status.padEnd(12);
-        const confidence = snapshot.confidence.padEnd(10);
-        console.log(`${runtime}  ${status}  ${confidence}  ${snapshot.note ?? "-"}`);
-      }
-    }
+    const { snapshots, warning } = loadQuotaSnapshots(runtimes, quotaOptions(args));
+    if (warning) console.error(`Warning: ${warning}`);
+    console.log(json ? JSON.stringify(snapshots, null, 2) : formatQuotaTable(snapshots));
     return;
   }
 

@@ -4,7 +4,7 @@ import { createDryRunPlan, formatDryRunPlan } from "../core/dry-run.js";
 import { executeAgent } from "../core/executor.js";
 import { formatRuntimeTable } from "../core/format.js";
 import { RUNTIME_IDS, type RuntimeId } from "../core/types.js";
-import { initialQuotaSnapshot } from "../quota/broker.js";
+import { loadQuotaSnapshots } from "../quota/state.js";
 import { UsageLedger } from "../usage/ledger.js";
 
 export default function agentFabricExtension(pi: ExtensionAPI): void {
@@ -17,13 +17,12 @@ export default function agentFabricExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("fabric-quota", {
-    description: "显示 Agent 额度状态；V0 只读且不发送模型请求",
+    description: "显示由本地 Usage Ledger 推导的 Agent 额度状态；不发送模型请求",
     handler: async (_args, ctx) => {
       const runtimes = await discoverRuntimes();
-      const lines = runtimes.map((runtime) => {
-        const quota = initialQuotaSnapshot(runtime);
-        return `${runtime.displayName}: ${quota.status} (${quota.confidence}) - ${quota.note ?? "-"}`;
-      });
+      const { snapshots } = loadQuotaSnapshots(runtimes);
+      const lines = snapshots.map((quota) =>
+        `${quota.runtime}: ${quota.state ?? "unknown"} / ${quota.status} (${quota.confidence}) - ${quota.note ?? "-"}`);
       ctx.ui.notify(lines.join("\n"), "info");
     },
   });
