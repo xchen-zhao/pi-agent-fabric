@@ -1,6 +1,5 @@
 # Pi Agent Fabric
 
-[![CI](https://github.com/xchen-zhao/pi-agent-fabric/actions/workflows/ci.yml/badge.svg)](https://github.com/xchen-zhao/pi-agent-fabric/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > Build the open, local-first, vendor-neutral orchestration fabric that developers trust to coordinate any AI agent—safely, transparently, and reliably.
